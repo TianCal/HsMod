@@ -827,6 +827,11 @@ namespace HsMod
                     {
                         cardId = GameUtils.GetHeroPowerCardIdFromHero(skinHero.Value);
                     }
+                    else if (__instance.GetCard().GetControllerSide() == global::Player.Side.FRIENDLY
+                        && Utils.RandomPremiumHeroSkin.TryGetHeroPower(cardId, DefLoader.Get().GetEntityDef(cardId).GetClass(), out string randomHeroPower))
+                    {
+                        cardId = randomHeroPower;
+                    }
                     else if (skinOpposingHero.Value != -1 && __instance.GetCard().GetControllerSide() == global::Player.Side.OPPOSING)
                     {
                         cardId = GameUtils.GetHeroPowerCardIdFromHero(skinOpposingHero.Value);
@@ -897,6 +902,8 @@ namespace HsMod
                             //UpdateCardsMappingReal(cardId, Utils.SkinType.HERO);
                             if (skinHero.Value != -1)
                                 cardId = GameUtils.TranslateDbIdToCardId(skinHero.Value);
+                            else if (Utils.RandomPremiumHeroSkin.TryGetHero(DefLoader.Get().GetEntityDef(cardId).GetClass(), out int randomHero))
+                                cardId = GameUtils.TranslateDbIdToCardId(randomHero);
                             else
                             {
                                 //LoadSkinsConfigFromFile();
