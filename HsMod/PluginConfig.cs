@@ -118,6 +118,7 @@ namespace HsMod
         public static ConfigEntry<int> skinBgsFinisher;
         public static ConfigEntry<int> skinBob;
         public static ConfigEntry<int> skinHero;
+        public static ConfigEntry<Utils.RandomPremiumSkinMode> randomPremiumHeroSkin;
         public static ConfigEntry<int> skinOpposingHero;
         public static ConfigEntry<bool> isFakePet;
         public static ConfigEntry<int> skinPet;
@@ -290,6 +291,7 @@ namespace HsMod
             skinOpposingPet = config.Bind(LocalizationManager.GetLangValue("skinOpposingPet.label"), LocalizationManager.GetLangValue("skinOpposingPet.name"), -1, LocalizationManager.GetLangValue("skinOpposingPet.description"));
             isSkinDefalutHeroEnable = config.Bind(LocalizationManager.GetLangValue("isSkinDefalutHeroEnable.label"), LocalizationManager.GetLangValue("isSkinDefalutHeroEnable.name"), false, LocalizationManager.GetLangValue("isSkinDefalutHeroEnable.description"));
             skinHero = config.Bind(LocalizationManager.GetLangValue("skinHero.label"), LocalizationManager.GetLangValue("skinHero.name"), -1, LocalizationManager.GetLangValue("skinHero.description"));
+            randomPremiumHeroSkin = config.Bind(LocalizationManager.GetLangValue("randomPremiumHeroSkin.label"), LocalizationManager.GetLangValue("randomPremiumHeroSkin.name"), Utils.RandomPremiumSkinMode.Disabled, LocalizationManager.GetLangValue("randomPremiumHeroSkin.description"));
             skinOpposingHero = config.Bind(LocalizationManager.GetLangValue("skinOpposingHero.label"), LocalizationManager.GetLangValue("skinOpposingHero.name"), -1, LocalizationManager.GetLangValue("skinOpposingHero.description"));
 
             keyTimeGearUp = config.Bind(LocalizationManager.GetLangValue("keyTimeGearUp.label"), LocalizationManager.GetLangValue("keyTimeGearUp.name"), new KeyboardShortcut(KeyCode.UpArrow), LocalizationManager.GetLangValue("keyTimeGearUp.description"));
