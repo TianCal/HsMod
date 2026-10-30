@@ -187,5 +187,54 @@ namespace HsMod
                 return basicHeroPowers.Contains(heroPowerCardId);
             }
         }
+
+        // 每局开局（收到 CREATE_GAME）时随机选一个宠物变体，只改内存中的“宠物”设置，不写回配置文件，
+        // 这样伪造宠物、酒馆宠物、棋盘角落等读取 skinPet 的功能都会用上这个随机宠物。
+        public static class RandomPetSkin
+        {
+            private static readonly System.Random random = new System.Random();
+
+            public static void OnPowerHistory(List<Network.PowerHistory> powerList)
+            {
+                if (randomPetSkin.Value == RandomPremiumSkinMode.Disabled || powerList == null) return;
+                if (!powerList.Any(x => x != null && x.Type == Network.PowerType.CREATE_GAME)) return;
+                MyLogger(BepInEx.Logging.LogLevel.Info, "RandomPetSkin: CREATE_GAME received");
+                try
+                {
+                    int petVariantId = Pick();
+                    if (petVariantId == -1)
+                    {
+                        MyLogger(BepInEx.Logging.LogLevel.Warning, "RandomPetSkin: no pet variant to pick");
+                        return;
+                    }
+                    bool saveOnConfigSet = skinPet.ConfigFile.SaveOnConfigSet;
+                    skinPet.ConfigFile.SaveOnConfigSet = false;
+                    skinPet.Value = petVariantId;
+                    skinPet.ConfigFile.SaveOnConfigSet = saveOnConfigSet;
+                    MyLogger(BepInEx.Logging.LogLevel.Info, $"RandomPetSkin: => {petVariantId} {GameDbf.PetVariant.GetRecord(petVariantId)?.Name?.GetString()}");
+                }
+                catch (Exception ex)
+                {
+                    MyLogger(BepInEx.Logging.LogLevel.Error, ex);
+                }
+            }
+
+            private static int Pick()
+            {
+                var records = GameDbf.PetVariant.GetRecords();
+                List<int> pool = records
+                    .Where(x => x != null && x.Enabled && x.PetId > 0)
+                    .Select(x => x.ID).ToList();
+                MyLogger(BepInEx.Logging.LogLevel.Info, $"RandomPetSkin: {records.Count} variants, {pool.Count} enabled");
+                if (randomPetSkin.Value == RandomPremiumSkinMode.Owned)
+                {
+                    PetsManager petsManager = PetsManager.Get();
+                    if (petsManager != null)
+                        pool = pool.Where(x => petsManager.IsPetVariantOwned(x)).ToList();
+                }
+                if (pool.Count == 0) return -1;
+                return pool[random.Next(pool.Count)];
+            }
+        }
     }
 }
