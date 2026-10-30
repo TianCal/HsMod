@@ -729,6 +729,7 @@ namespace HsMod
             [HarmonyPatch(typeof(Network), "GetPowerHistory")]
             public static void PatchGetPowerHistory(ref List<Network.PowerHistory> __result)
             {
+                Utils.RandomPetSkin.OnPowerHistory(__result);
                 if (!isFakePet.Value) return;
                 __result = Utils.HandlePowerHistory(__result);
             }
