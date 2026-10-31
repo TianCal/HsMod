@@ -63,6 +63,18 @@ namespace HsMod
             }
         }
 
+        // 分解相关接口只接受本机发来、Host/Origin 都是本机地址、且带自定义请求头的请求：
+        // 自定义头会触发 CORS 预检（这里不回 CORS 头，所以其他网页提交不了），Host 检查挡住 DNS rebinding
+        private static bool IsTrustedDisenchantRequest(HttpListenerRequest request)
+        {
+            string origin = request.Headers["Origin"];
+            bool localHost = request.Url.Host == "127.0.0.1" || request.Url.Host == "localhost";
+            bool localOrigin = string.IsNullOrEmpty(origin)
+                || origin == $"http://127.0.0.1:{request.Url.Port}" || origin == $"http://localhost:{request.Url.Port}";
+            return IPAddress.IsLoopback(request.RemoteEndPoint.Address) && localHost && localOrigin
+                && request.Headers["X-HsMod-Disenchant"] == "confirm";
+        }
+
         private static async Task ProcessRequestAsync(HttpListenerContext context)
         {
             var request = context.Request;
@@ -111,6 +123,68 @@ namespace HsMod
                     {
                         await writer.WriteLineAsync(output);
                     }
+                }
+            }
+            else if (rawUrLower == "/disenchant/settings" && request.HttpMethod == "POST")
+            {
+                // 保存 /disenchant 页面自己的设置（最少对局数、范围），校验和分解请求相同
+                string output;
+                if (!IsTrustedDisenchantRequest(request))
+                {
+                    context.Response.StatusCode = 403;
+                    output = "forbidden";
+                }
+                else
+                {
+                    try
+                    {
+                        string requestBody;
+                        using (var reader = new StreamReader(request.InputStream))
+                            requestBody = await reader.ReadToEndAsync();
+                        var values = Newtonsoft.Json.JsonConvert.DeserializeObject<Utils.DisenchantSettings.Values>(requestBody);
+                        if (values == null) throw new Exception("no settings");
+                        Utils.DisenchantSettings.Save(values);
+                        output = "ok";
+                    }
+                    catch (Exception ex)
+                    {
+                        context.Response.StatusCode = 400;
+                        output = ex.Message;
+                    }
+                }
+                using (var writer = new StreamWriter(context.Response.OutputStream))
+                {
+                    await writer.WriteLineAsync(output);
+                }
+            }
+            else if (rawUrLower == "/disenchant" && request.HttpMethod == "POST")
+            {
+                string output;
+                if (!IsTrustedDisenchantRequest(request))
+                {
+                    context.Response.StatusCode = 403;
+                    output = "forbidden";
+                }
+                else
+                {
+                    string requestBody;
+                    using (var reader = new StreamReader(request.InputStream))
+                        requestBody = await reader.ReadToEndAsync();
+                    // 页面提交的是它显示并经用户确认的那份清单：[{ "id": 卡牌ID, "premium": "NORMAL"/"GOLDEN", "count": 张数 }, ...]
+                    var cards = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Utils.Disenchanter.RequestedCard>>(requestBody);
+                    if (cards == null || cards.Count == 0)
+                    {
+                        context.Response.StatusCode = 400;
+                        output = "no cards";
+                    }
+                    else
+                    {
+                        context.Response.StatusCode = Utils.Disenchanter.Request(cards, out output) ? 200 : 409;
+                    }
+                }
+                using (var writer = new StreamWriter(context.Response.OutputStream))
+                {
+                    await writer.WriteLineAsync(output);
                 }
             }
             else if (rawUrLower == "/config" && request.HttpMethod == "POST" && !pluginConfigLock)
@@ -333,6 +407,8 @@ namespace HsMod
                     return WebPage.InfoPage();
                 case "/collection":
                     return WebPage.CollectionPage();
+                case "/disenchant":
+                    return WebPage.DisenchantPage();
                 case "/pack":
                     return WebPage.PackPage();
                 case "/skins":

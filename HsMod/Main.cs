@@ -190,6 +190,7 @@ namespace HsMod
 
         private void Update()
         {
+            Utils.Disenchanter.Update();
             // 定时退出：到点后不在对局中立即退出；对局中等待结算退出（见 PatchEndGameScreenShow），超时 1818 秒兜底强制退出
             if ((autoQuitTimer.Value > 0) && (ConfigValue.Get().RunningTime >= autoQuitTimer.Value))
             {

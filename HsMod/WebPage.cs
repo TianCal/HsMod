@@ -16,6 +16,7 @@ namespace HsMod
             string btn = @" <a href=""/info""><button class=""btn_li"">主要信息</button><br/></a><br />";
             btn += @"<a href=""/pack""><button class=""btn_li"">卡包信息</button><br/></a><br />";
             btn += @"<a href=""/collection""><button class=""btn_li"">卡牌收藏</button><br /></a><br />";
+            btn += @"<a href=""/disenchant""><button class=""btn_li"">卡牌分解</button><br /></a><br />";
             btn += @"<a href=""/skins""><button class=""btn_li"">皮肤信息</button><br /></a><br />";
             btn += @"<a href=""/lettuce""><button class=""btn_li"">佣兵关卡</button><br /></a><br />";
             btn += @"<a href=""/mercenaries""><button class=""btn_li"">佣兵收藏</button><br /></a><br />";
@@ -461,6 +462,268 @@ namespace HsMod
             }
             return Template("Collection", body);
         }
+
+        // 列出没用的卡里可以分解的卡；分解只在勾选、点按钮并确认后由 Utils.Disenchanter 执行
+        public static StringBuilder DisenchantPage()
+        {
+            string body = @"<h3 style=""text-align: center;"">分解没用的卡</h3>";
+            try
+            {
+                var settings = Utils.DisenchantSettings.Get();
+                // 页面自己的设置：最少对局数、范围。保存走带校验的 POST，保存后刷新页面
+                body += $@"<p>最少对局数 <input type=""number"" id=""hsMinGames"" min=""0"" value=""{settings.minGames}"" style=""width: 7em;"" />
+范围 <select id=""hsScope"">
+<option value=""golden""{(settings.allCards ? "" : " selected")}>金卡（只列同时有普通版的，普通版保留）</option>
+<option value=""all""{(settings.allCards ? " selected" : "")}>所有没用的卡（普通版、金卡分开列）</option>
+</select>
+<button onclick=""hsSaveSettings()"">保存</button></p>
+<script>
+function hsSaveSettings() {{
+  var body = {{ minGames: Math.max(0, parseInt(document.getElementById('hsMinGames').value || '0', 10) || 0), allCards: document.getElementById('hsScope').value === 'all' }};
+  fetch('/disenchant/settings', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json', 'X-HsMod-Disenchant': 'confirm' }}, body: JSON.stringify(body) }})
+    .then(r => r.text()).then(t => {{ if (t.trim() !== 'ok') alert(t); location.reload(); }})
+    .catch(e => alert('保存失败：' + e));
+}}
+</script>";
+
+                if (SceneMgr.Get().GetMode() != SceneMgr.Mode.COLLECTIONMANAGER)
+                {
+                    throw new Exception("请先进入收藏模式。");
+                }
+                var file = Utils.UsedCards.Load();
+                if (file == null)
+                {
+                    throw new Exception($"找不到 {Utils.UsedCards.FilePath}，请先运行 tools/used_cards.py。");
+                }
+                int minGames = settings.minGames;
+                var candidates = Utils.UsedCards.GetCandidates(file, minGames, settings.allCards)
+                    .OrderByDescending(x => x.SellValue * x.Count).ThenBy(x => x.Name).ThenBy(x => x.Premium).ToList();
+
+                int totalCopies = candidates.Sum(x => x.Count);
+                int totalDust = candidates.Sum(x => x.SellValue * x.Count);
+                int usedCount = file.cards.Values.Count(x => Utils.UsedCards.IsUsed(x, minGames));
+                string lastRun = file.runs.Count > 0 && file.runs.Last().TryGetValue("date", out object date) ? date?.ToString() : "?";
+                body += $"<li>有用卡名单：{usedCount} 个卡牌版本（最少对局数 {minGames}，名单更新于 {lastRun}，共 {file.runs.Count} 次）</li>";
+                body += settings.allCards
+                    ? $"<li>没用的卡：{candidates.Count} 行（普通版、金卡分开），共 {totalCopies} 张</li>"
+                    : $"<li>没用、且同时有普通版和金卡的卡：{candidates.Count} 种，金卡 {totalCopies} 张（普通版保留）</li>";
+                body += $"<li>全部分解可得奥术之尘：{totalDust}</li>";
+                if (minGames > 0)
+                    body += $"<li>“出现过的卡组”只列出出现过但不到 {minGames} 局的卡：取对局数最多的那个模式和赛季里，用到这张卡最多的卡组类型。</li>";
+                body += "<br />";
+
+                // 分解：勾选、确认，再由游戏主线程逐行执行；刷新页面查看进度
+                string blocked = Utils.Disenchanter.BlockedReason;
+                bool running = Utils.Disenchanter.IsRunning;
+                bool canSelect = !running && blocked == null && candidates.Count > 0;
+                if (running)
+                    body += $"<p><b>正在分解，剩余 {Utils.Disenchanter.Remaining} 行。刷新页面查看进度。</b></p>";
+                else if (blocked != null)
+                    body += $"<p><b>{System.Net.WebUtility.HtmlEncode(blocked)}</b></p>";
+                else if (canSelect)
+                {
+                    // 提交的是页面上勾选的那几行（卡牌 ID + 版本 + 张数），服务器只分解其中仍在清单里、且张数没变的行
+                    var jsonSettings = new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml };
+                    string cardsJson = Newtonsoft.Json.JsonConvert.SerializeObject(candidates.Select(x => new
+                    {
+                        id = x.CardId,
+                        premium = x.Premium.ToString(),
+                        count = x.Count,
+                        name = x.Name + (x.Premium == TAG_PREMIUM.GOLDEN ? "（金）" : ""),
+                        dust = x.SellValue * x.Count
+                    }), jsonSettings);
+                    string keep = settings.allCards ? "" : "普通版保留，";
+                    body += $@"<p><span id=""hsSummary"">已选 0 行</span>
+<button id=""hsGo"" onclick=""hsDisenchant()"" disabled>分解所选</button></p>
+<script>
+var hsCards = {cardsJson};
+function hsSelected() {{
+  return Array.from(document.querySelectorAll('.hsPick:checked')).map(x => hsCards[+x.value]);
+}}
+function hsUpdate() {{
+  var sel = hsSelected();
+  var copies = sel.reduce((a, c) => a + c.count, 0), dust = sel.reduce((a, c) => a + c.dust, 0);
+  document.getElementById('hsSummary').textContent = '已选 ' + sel.length + ' 行、' + copies + ' 张、' + dust + ' 尘';
+  document.getElementById('hsGo').disabled = sel.length === 0;
+  var all = document.getElementById('hsAll');
+  if (all) all.checked = sel.length === hsCards.length;
+}}
+function hsToggleAll(on) {{
+  document.querySelectorAll('.hsPick').forEach(x => x.checked = on);
+  hsUpdate();
+}}
+function hsDisenchant() {{
+  var sel = hsSelected();
+  if (sel.length === 0) return;
+  var copies = sel.reduce((a, c) => a + c.count, 0), dust = sel.reduce((a, c) => a + c.dust, 0);
+  var names = sel.slice(0, 20).map(c => c.name + ' ×' + c.count).join('\n') + (sel.length > 20 ? '\n……等 ' + sel.length + ' 行' : '');
+  if (!confirm('确定分解以下 ' + sel.length + ' 行、共 ' + copies + ' 张（' + dust + ' 尘）吗？{keep}分解不能撤销。\n\n' + names)) return;
+  fetch('/disenchant', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json', 'X-HsMod-Disenchant': 'confirm' }}, body: JSON.stringify(sel.map(c => ({{ id: c.id, premium: c.premium, count: c.count }}))) }})
+    .then(r => r.text()).then(t => {{ alert(t); location.reload(); }})
+    .catch(e => alert('提交失败：' + e));
+}}
+// 浏览器刷新后可能按位置恢复勾选，而行已经变了：载入时一律清空
+window.addEventListener('DOMContentLoaded', () => hsToggleAll(false));
+</script>";
+                }
+                var results = Utils.Disenchanter.GetResults();
+                if (results.Count > 0)
+                {
+                    body += "<p>本次分解记录：</p><ul>";
+                    foreach (string line in results) body += $"<li>{System.Net.WebUtility.HtmlEncode(line)}</li>";
+                    body += "</ul>";
+                }
+                body += "<hr />";
+
+                string selectHeader = canSelect ? @"<th><input type=""checkbox"" id=""hsAll"" autocomplete=""off"" onclick=""hsToggleAll(this.checked)"" title=""全选"" /></th>" : "";
+                // 出现过（对局数 > 0）的行标浅黄色；隔行底色、鼠标悬停整行高亮，方便横向对照
+                string temp = @"<style>
+table.hsTable tr.hsRow:nth-child(even) { background: rgba(128, 128, 128, 0.07); }
+table.hsTable tr.hsRow.hsSeen { background: rgba(255, 200, 0, 0.22); }
+table.hsTable tr.hsRow:hover { background: rgba(80, 160, 255, 0.25); }
+table.hsTable th[draggable=true] { cursor: move; }
+table.hsTable th.hsDragOver { outline: 2px dashed rgba(80, 160, 255, 0.9); }
+</style>";
+                temp += $@"<table class=""hsTable"" border=0 style=""text-align: center;""><tr>{selectHeader}<th>卡牌名称</th><th>版本</th><th>类型</th><th>费用</th><th>身材</th><th style=""min-width: 16em;"">描述</th><th class=""hsSort"" data-key=""rarity"" data-label=""稀有度"" onclick=""hsSortBy('rarity')"" style=""cursor: pointer;"">稀有度 ⇅</th><th class=""hsSort"" data-key=""set"" data-label=""扩展包"" onclick=""hsSortBy('set')"" style=""cursor: pointer;"">扩展包 ⇅</th><th>拥有（普通/金卡）</th><th>分解</th><th>可得尘</th><th class=""hsSort"" data-key=""games"" data-label=""最高对局数"" onclick=""hsSortBy('games')"" style=""cursor: pointer;"">最高对局数 ⇅</th><th>出现过的卡组</th></tr>";
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    var card = candidates[i];
+                    // data-* 用于点表头排序：稀有度按 普通<稀有<史诗<传说，扩展包按游戏里的扩展包编号（大致是发布顺序）
+                    temp += $@"<tr class=""hsRow{(card.MaxGames > 0 ? " hsSeen" : "")}"" data-rarity=""{(int)card.Rarity}"" data-set=""{(int)card.Set}"" data-setname=""{System.Net.WebUtility.HtmlEncode(GameStrings.GetCardSetName(card.Set))}"" data-games=""{card.MaxGames}"" data-order=""{i}"">";
+                    if (canSelect) temp += $@"<td><input type=""checkbox"" class=""hsPick"" autocomplete=""off"" value=""{i}"" onchange=""hsUpdate()"" /></td>";
+                    temp += $"<td>{System.Net.WebUtility.HtmlEncode(card.Name)}</td>";
+                    temp += $"<td>{(card.Premium == TAG_PREMIUM.GOLDEN ? "金卡" : "普通")}</td>";
+                    temp += $"<td>{CardTypeName(card.CardType)}</td>";
+                    temp += $"<td>{card.Cost}</td>";
+                    temp += $"<td>{card.Stats}</td>";
+                    temp += $@"<td style=""text-align: left; white-space: normal;"">{CardTextHtml(card.Text)}</td>";
+                    temp += $"<td>{RarityName(card.Rarity)}</td>";
+                    temp += $"<td>{System.Net.WebUtility.HtmlEncode(GameStrings.GetCardSetName(card.Set))}</td>";
+                    temp += $"<td>{card.NormalCount}/{card.GoldenCount}</td>";
+                    temp += $"<td>{card.Count}</td>";
+                    temp += $"<td>{card.SellValue * card.Count}</td>";
+                    temp += $"<td>{(card.MaxGames > 0 ? $"{card.MaxGames}（{System.Net.WebUtility.HtmlEncode(card.GamesKey)}）" : "0")}</td>";
+                    // 只给“出现过但不到最少对局数”的卡列卡组
+                    string decks = minGames > 0 && card.MaxGames > 0 && card.Decks.Count > 0
+                        ? string.Join("<br />", card.Decks.Select(d => $"{System.Net.WebUtility.HtmlEncode(d.Key)}（{d.Value}）"))
+                        : "";
+                    temp += $@"<td style=""text-align: left; white-space: nowrap;"">{decks}</td>";
+                    temp += "</tr>";
+                }
+                temp += "</table>";
+                // 点“稀有度”“扩展包”“最高对局数”表头排序，再点一次反过来；勾选框跟着行走，value 还是原来的序号
+                temp += @"<script>
+var hsSortState = { key: null, desc: false };
+function hsSortBy(key) {
+  hsSortState.desc = hsSortState.key === key ? !hsSortState.desc : false;
+  hsSortState.key = key;
+  var rows = Array.from(document.querySelectorAll('tr.hsRow'));
+  if (rows.length === 0) return;
+  var parent = rows[0].parentNode;
+  rows.sort(function (a, b) {
+    var r = (+a.dataset[key]) - (+b.dataset[key]);
+    if (r === 0 && key === 'set') r = a.dataset.setname.localeCompare(b.dataset.setname);
+    if (hsSortState.desc) r = -r;
+    return r !== 0 ? r : (+a.dataset.order) - (+b.dataset.order);
+  });
+  rows.forEach(function (row) { parent.appendChild(row); });
+  document.querySelectorAll('th.hsSort').forEach(function (th) {
+    th.textContent = th.dataset.label + (th.dataset.key === key ? (hsSortState.desc ? ' ▼' : ' ▲') : ' ⇅');
+  });
+}
+// 拖动表头调整列顺序；顺序按列的原始序号存在浏览器里（localStorage），下次打开照旧
+(function () {
+  var table = document.querySelector('table.hsTable');
+  if (!table) return;
+  var header = table.rows[0];
+  for (var c = 0; c < header.cells.length; c++) {
+    header.cells[c].dataset.col = c;
+    header.cells[c].draggable = true;
+  }
+  function moveColumn(from, to) {
+    if (from === to) return;
+    Array.from(table.rows).forEach(function (row) {
+      var cell = row.cells[from], ref = row.cells[to];
+      if (!cell || !ref) return;
+      row.insertBefore(cell, from < to ? ref.nextSibling : ref);
+    });
+  }
+  function saveOrder() {
+    try { localStorage.setItem('hsDisenchantCols', JSON.stringify(Array.from(header.cells).map(function (th) { return th.dataset.col; }))); } catch (e) {}
+  }
+  try {
+    var saved = JSON.parse(localStorage.getItem('hsDisenchantCols') || 'null');
+    if (saved && saved.length === header.cells.length) {
+      saved.forEach(function (col, pos) {
+        var from = Array.from(header.cells).findIndex(function (th) { return th.dataset.col === String(col); });
+        if (from >= 0) moveColumn(from, pos);
+      });
+    }
+  } catch (e) {}
+  var dragFrom = -1;
+  Array.from(header.cells).forEach(function (th) {
+    th.addEventListener('dragstart', function (e) { dragFrom = th.cellIndex; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); });
+    th.addEventListener('dragover', function (e) { e.preventDefault(); th.classList.add('hsDragOver'); });
+    th.addEventListener('dragleave', function () { th.classList.remove('hsDragOver'); });
+    th.addEventListener('drop', function (e) {
+      e.preventDefault();
+      th.classList.remove('hsDragOver');
+      if (dragFrom >= 0) { moveColumn(dragFrom, th.cellIndex); saveOrder(); }
+      dragFrom = -1;
+    });
+  });
+})();
+</script>";
+                body += temp;
+            }
+            catch (Exception ex)
+            {
+                body += $@"无法生成分解预览：<br /><p style=""white-space: pre-line;"">{System.Net.WebUtility.HtmlEncode(ex.Message)}</p><br />";
+            }
+            return Template("Disenchant", body);
+        }
+
+        private static string CardTypeName(TAG_CARDTYPE type)
+        {
+            switch (type)
+            {
+                case TAG_CARDTYPE.MINION: return "随从";
+                case TAG_CARDTYPE.SPELL: return "法术";
+                case TAG_CARDTYPE.WEAPON: return "武器";
+                case TAG_CARDTYPE.HERO: return "英雄";
+                case TAG_CARDTYPE.LOCATION: return "地标";
+                default: return type.ToString();
+            }
+        }
+
+        // 卡牌描述：去掉 [x] 和换行，只保留加粗/斜体，其余全部转义
+        private static string CardTextHtml(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            text = text.Replace("[x]", "").Replace("\r", "");
+            // 和游戏一样：中日文的换行直接去掉，其他语言换成空格
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?<=[\u3000-\u9fff\uff00-\uffef])\n|\n(?=[\u3000-\u9fff\uff00-\uffef])", "");
+            text = text.Replace("\n", " ");
+            // 只去掉真正像标签的 <xxx>（保留 b/i），单独的“<”不动，以免吞掉后面的文字
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"<(?!/?[bi]>)/?[A-Za-z][^<>]*>", "");
+            string html = System.Net.WebUtility.HtmlEncode(text);
+            foreach (string tag in new[] { "b", "i", "/b", "/i" })
+                html = html.Replace($"&lt;{tag}&gt;", $"<{tag}>");
+            return html.Trim();
+        }
+
+        private static string RarityName(TAG_RARITY rarity)
+        {
+            switch (rarity)
+            {
+                case TAG_RARITY.COMMON: return "普通";
+                case TAG_RARITY.RARE: return "稀有";
+                case TAG_RARITY.EPIC: return "史诗";
+                case TAG_RARITY.LEGENDARY: return "传说";
+                default: return rarity.ToString();
+            }
+        }
+
         public static StringBuilder MercenariesLettucePage()
         {
             StringBuilder builder = new StringBuilder();
