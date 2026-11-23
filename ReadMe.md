@@ -129,6 +129,17 @@ Choose BepInEx 5 (BepInEx 6 is still pre-release and is not adapted for now). He
    - older BepInEx: set `dllSearchPathOverride=BepInEx\unstripped_corlib`
 5. Put `HsMod.dll` into `Hearthstone\BepInEx\plugins`.
 
+### Sharing an installation with HsAuto
+
+If you want HsMod only when using its shortcut, give it a separate BepInEx directory. Keep the default `BepInEx` directory for HsAuto's runtime and bridge.
+
+1. Close Hearthstone. Create `BepInEx.HsMod` alongside `BepInEx` and copy over the BepInEx `core` directory. Put `HsMod.dll` in `BepInEx.HsMod\plugins`. Copy any existing HsMod settings and skins into `BepInEx.HsMod\config`.
+2. Move any existing `HsMod.dll` out of the default `BepInEx\plugins` directory. Leave HsAuto's files and `doorstop_config.ini` in place.
+3. Add `--doorstop-target-assembly "BepInEx.HsMod\core\BepInEx.Preloader.dll"` to the Hearthstone command used by the HsMod shortcut. Set the working directory to the Hearthstone folder or use an absolute path for the preloader. [Doorstop launch options](https://github.com/NeighTools/UnityDoorstop#cli-arguments)
+4. Check `BepInEx.HsMod\LogOutput.log` for HsMod startup. Its settings are in `BepInEx.HsMod\config\HsMod.cfg`.
+
+The Windows post-build script copies `HsMod.dll` into the default plugin directory. For a separate HsMod directory, build with `-p:PostBuildEvent=` and copy the DLL into `BepInEx.HsMod\plugins` yourself.
+
 </details>
 
 <details>
