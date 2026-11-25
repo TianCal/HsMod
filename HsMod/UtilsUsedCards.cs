@@ -226,7 +226,7 @@ namespace HsMod
                 lock (settingsLock)
                 {
                     var clean = new Values { minGames = Math.Max(0, values.minGames), allCards = values.allCards };
-                    File.WriteAllText(FilePath, JsonConvert.SerializeObject(clean, Formatting.Indented));
+                    File.WriteAllText(FilePath, JsonConvert.SerializeObject(clean));
                     cached = clean;
                 }
             }

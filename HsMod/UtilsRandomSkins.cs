@@ -209,7 +209,13 @@ namespace HsMod
                 }
                 if (!picks.TryGetValue(heroClass, out heroDbId))
                 {
-                    heroDbId = Pick(heroClass);
+                    // 抽皮肤出错时用原英雄，不能让异常冒到 Entity.LoadCard 里卡住对局加载
+                    try { heroDbId = Pick(heroClass); }
+                    catch (Exception ex)
+                    {
+                        heroDbId = -1;
+                        MyLogger(BepInEx.Logging.LogLevel.Error, $"RandomPremiumHeroSkin: draw failed for {heroClass}, keeping the original hero: {ex}");
+                    }
                     picks[heroClass] = heroDbId;
                     MyLogger(BepInEx.Logging.LogLevel.Info, $"RandomPremiumHeroSkin: {heroClass} => {heroDbId} {(heroDbId == -1 ? "" : GameUtils.TranslateDbIdToCardId(heroDbId))}");
                 }
@@ -275,7 +281,8 @@ namespace HsMod
                 try
                 {
                     string tmp = BagFilePath + ".tmp";
-                    File.WriteAllText(tmp, JsonConvert.SerializeObject(bags, Formatting.Indented), new System.Text.UTF8Encoding(false));
+                    // 游戏自带的 Newtonsoft.Json 是裁剪版，没有 SerializeObject(object, Formatting)
+                    File.WriteAllText(tmp, JsonConvert.SerializeObject(bags), new System.Text.UTF8Encoding(false));
                     if (File.Exists(BagFilePath)) File.Delete(BagFilePath);
                     File.Move(tmp, BagFilePath);
                 }

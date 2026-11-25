@@ -523,7 +523,8 @@ function hsSaveSettings() {{
                 else if (canSelect)
                 {
                     // 提交的是页面上勾选的那几行（卡牌 ID + 版本 + 张数），服务器只分解其中仍在清单里、且张数没变的行
-                    var jsonSettings = new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml };
+                    // 游戏自带的 Newtonsoft.Json 是裁剪版，没有 StringEscapeHandling，自己把 HTML 字符转义成 \uXXXX，
+                    // 这样卡名里出现 </script> 之类也不会跳出脚本。这些字符只会出现在 JSON 字符串里，转义后值不变。
                     string cardsJson = Newtonsoft.Json.JsonConvert.SerializeObject(candidates.Select(x => new
                     {
                         id = x.CardId,
@@ -531,7 +532,7 @@ function hsSaveSettings() {{
                         count = x.Count,
                         name = x.Name + (x.Premium == TAG_PREMIUM.GOLDEN ? "（金）" : ""),
                         dust = x.SellValue * x.Count
-                    }), jsonSettings);
+                    })).Replace("<", "\\u003c").Replace(">", "\\u003e").Replace("&", "\\u0026").Replace("'", "\\u0027");
                     string keep = settings.allCards ? "" : "普通版保留，";
                     body += $@"<p><span id=""hsSummary"">已选 0 行</span>
 <button id=""hsGo"" onclick=""hsDisenchant()"" disabled>分解所选</button></p>
