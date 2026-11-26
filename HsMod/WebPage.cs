@@ -467,6 +467,7 @@ namespace HsMod
         public static StringBuilder DisenchantPage()
         {
             string body = @"<h3 style=""text-align: center;"">分解没用的卡</h3>";
+            int setFilterAt = body.Length;   // 扩展包筛选要等算出清单后才知道有哪些扩展包，最后插到标题下面
             try
             {
                 var settings = Utils.DisenchantSettings.Get();
@@ -498,6 +499,21 @@ function hsSaveSettings() {{
                 int minGames = settings.minGames;
                 var candidates = Utils.UsedCards.GetCandidates(file, minGames, settings.allCards)
                     .OrderByDescending(x => x.SellValue * x.Count).ThenBy(x => x.Name).ThenBy(x => x.Premium).ToList();
+
+                // 扩展包筛选：只列清单里出现的扩展包，按扩展包编号（大致是发布顺序）排，默认全选。
+                // 不记在浏览器里，每次打开页面都是全选；去掉勾的扩展包整行隐藏，行里的勾选也一并取消
+                var sets = candidates.GroupBy(x => x.Set)
+                    .Select(g => new { Id = (int)g.Key, Name = GameStrings.GetCardSetName(g.Key), Rows = g.Count(), Copies = g.Sum(x => x.Count), Dust = g.Sum(x => x.SellValue * x.Count) })
+                    .OrderBy(x => x.Id).ThenBy(x => x.Name).ToList();
+                if (sets.Count > 0)
+                {
+                    string setFilter = $@"<div id=""hsSetFilter"" style=""margin: 0.5em 0; line-height: 1.8;""><b>扩展包</b>（显示 <span id=""hsShown"">{candidates.Count}</span>/{candidates.Count} 行）
+<button onclick=""hsSetAll(true)"">全选</button> <button onclick=""hsSetAll(false)"">全不选</button><br />";
+                    foreach (var set in sets)
+                        setFilter += $@"<label style=""white-space: nowrap; margin-right: 1em;"" title=""{set.Copies} 张，{set.Dust} 尘""><input type=""checkbox"" class=""hsSet"" value=""{set.Id}"" checked autocomplete=""off"" onchange=""hsApplySets()"" />{System.Net.WebUtility.HtmlEncode(set.Name)}（{set.Rows}）</label> ";
+                    setFilter += "</div><hr />";
+                    body = body.Insert(setFilterAt, setFilter);
+                }
 
                 int totalCopies = candidates.Sum(x => x.Count);
                 int totalDust = candidates.Sum(x => x.SellValue * x.Count);
@@ -539,7 +555,7 @@ function hsSaveSettings() {{
 <script>
 var hsCards = {cardsJson};
 function hsSelected() {{
-  return Array.from(document.querySelectorAll('.hsPick:checked')).map(x => hsCards[+x.value]);
+  return Array.from(document.querySelectorAll('tr.hsRow:not(.hsHidden) .hsPick:checked')).map(x => hsCards[+x.value]);
 }}
 function hsUpdate() {{
   var sel = hsSelected();
@@ -547,10 +563,11 @@ function hsUpdate() {{
   document.getElementById('hsSummary').textContent = '已选 ' + sel.length + ' 行、' + copies + ' 张、' + dust + ' 尘';
   document.getElementById('hsGo').disabled = sel.length === 0;
   var all = document.getElementById('hsAll');
-  if (all) all.checked = sel.length === hsCards.length;
+  var visible = document.querySelectorAll('tr.hsRow:not(.hsHidden) .hsPick').length;
+  if (all) all.checked = visible > 0 && sel.length === visible;
 }}
 function hsToggleAll(on) {{
-  document.querySelectorAll('.hsPick').forEach(x => x.checked = on);
+  document.querySelectorAll('tr.hsRow:not(.hsHidden) .hsPick').forEach(x => x.checked = on);
   hsUpdate();
 }}
 function hsDisenchant() {{
@@ -579,7 +596,8 @@ window.addEventListener('DOMContentLoaded', () => hsToggleAll(false));
                 string selectHeader = canSelect ? @"<th><input type=""checkbox"" id=""hsAll"" autocomplete=""off"" onclick=""hsToggleAll(this.checked)"" title=""全选"" /></th>" : "";
                 // 出现过（对局数 > 0）的行标浅黄色；隔行底色、鼠标悬停整行高亮，方便横向对照
                 string temp = @"<style>
-table.hsTable tr.hsRow:nth-child(even) { background: rgba(128, 128, 128, 0.07); }
+table.hsTable tr.hsRow.hsAlt { background: rgba(128, 128, 128, 0.07); }
+table.hsTable tr.hsRow.hsHidden { display: none; }
 table.hsTable tr.hsRow.hsSeen { background: rgba(255, 200, 0, 0.22); }
 table.hsTable tr.hsRow:hover { background: rgba(80, 160, 255, 0.25); }
 table.hsTable th[draggable=true] { cursor: move; }
@@ -614,6 +632,33 @@ table.hsTable th.hsDragOver { outline: 2px dashed rgba(80, 160, 255, 0.9); }
                 temp += "</table>";
                 // 点“稀有度”“扩展包”“最高对局数”表头排序，再点一次反过来；勾选框跟着行走，value 还是原来的序号
                 temp += @"<script>
+// 隔行底色按显示出来的行算，筛掉的行不占位置；排序、筛选后都要重新算
+function hsStripe() {
+  var n = 0;
+  document.querySelectorAll('tr.hsRow').forEach(function (row) {
+    row.classList.toggle('hsAlt', !row.classList.contains('hsHidden') && n++ % 2 === 1);
+  });
+}
+function hsApplySets() {
+  var on = {};
+  document.querySelectorAll('.hsSet').forEach(function (x) { if (x.checked) on[x.value] = true; });
+  var shown = 0;
+  document.querySelectorAll('tr.hsRow').forEach(function (row) {
+    var show = !!on[row.dataset.set];
+    row.classList.toggle('hsHidden', !show);
+    if (show) shown++;
+    else { var pick = row.querySelector('.hsPick'); if (pick) pick.checked = false; }
+  });
+  var label = document.getElementById('hsShown');
+  if (label) label.textContent = shown;
+  hsStripe();
+  if (typeof hsUpdate === 'function') hsUpdate();
+}
+function hsSetAll(on) {
+  document.querySelectorAll('.hsSet').forEach(function (x) { x.checked = on; });
+  hsApplySets();
+}
+hsStripe();
 var hsSortState = { key: null, desc: false };
 function hsSortBy(key) {
   hsSortState.desc = hsSortState.key === key ? !hsSortState.desc : false;
@@ -628,6 +673,7 @@ function hsSortBy(key) {
     return r !== 0 ? r : (+a.dataset.order) - (+b.dataset.order);
   });
   rows.forEach(function (row) { parent.appendChild(row); });
+  hsStripe();
   document.querySelectorAll('th.hsSort').forEach(function (th) {
     th.textContent = th.dataset.label + (th.dataset.key === key ? (hsSortState.desc ? ' ▼' : ' ▲') : ' ⇅');
   });
