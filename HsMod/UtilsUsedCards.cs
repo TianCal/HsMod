@@ -23,9 +23,16 @@ namespace HsMod
                 public string lastSeen;
             }
 
+            // 只读需要的字段。不能用 Dictionary<string, object>：嵌套的 formats 对象会被反序列化成 JObject，
+            // 而游戏自带的裁剪版 Newtonsoft.Json 里 JObject 加载不了（VTable setup failed）。没声明的字段直接跳过
+            public class UsedCardsRun
+            {
+                public string date;
+            }
+
             public class UsedCardsFile
             {
-                public List<Dictionary<string, object>> runs = new List<Dictionary<string, object>>();
+                public List<UsedCardsRun> runs = new List<UsedCardsRun>();
                 public Dictionary<string, UsedCardEntry> cards = new Dictionary<string, UsedCardEntry>();
             }
 

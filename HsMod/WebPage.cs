@@ -502,8 +502,8 @@ function hsSaveSettings() {{
                 int totalCopies = candidates.Sum(x => x.Count);
                 int totalDust = candidates.Sum(x => x.SellValue * x.Count);
                 int usedCount = file.cards.Values.Count(x => Utils.UsedCards.IsUsed(x, minGames));
-                string lastRun = file.runs.Count > 0 && file.runs.Last().TryGetValue("date", out object date) ? date?.ToString() : "?";
-                body += $"<li>有用卡名单：{usedCount} 个卡牌版本（最少对局数 {minGames}，名单更新于 {lastRun}，共 {file.runs.Count} 次）</li>";
+                string lastRun = file.runs?.LastOrDefault()?.date ?? "?";
+                body += $"<li>有用卡名单：{usedCount} 个卡牌版本（最少对局数 {minGames}，名单更新于 {lastRun}，共 {file.runs?.Count ?? 0} 次）</li>";
                 body += settings.allCards
                     ? $"<li>没用的卡：{candidates.Count} 行（普通版、金卡分开），共 {totalCopies} 张</li>"
                     : $"<li>没用、且同时有普通版和金卡的卡：{candidates.Count} 种，金卡 {totalCopies} 张（普通版保留）</li>";
