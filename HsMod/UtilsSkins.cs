@@ -1,10 +1,34 @@
 ﻿using System;
+using System.Collections.Generic;
 using static HsMod.PluginConfig;
 
 namespace HsMod
 {
     public partial class Utils
     {
+        private static GameState randomPremiumGame;
+        private static readonly Dictionary<string, bool> randomPremiumPicks = new Dictionary<string, bool>();
+        private static readonly Random randomPremium = new Random();
+
+        // 同时有钻石和异画的卡，按“实体 ID + 卡牌 ID”在本局内只抽一次，之后一直沿用。
+        // 变形后卡牌 ID 不同会重新抽；新的一局（新的 GameState）清空记录。
+        private static bool RandomPicksSignature(EntityBase entity)
+        {
+            GameState gameState = GameState.Get();
+            if (!ReferenceEquals(gameState, randomPremiumGame))
+            {
+                randomPremiumPicks.Clear();
+                randomPremiumGame = gameState;
+            }
+            string key = entity.GetEntityId() + ":" + entity.GetCardId();
+            if (!randomPremiumPicks.TryGetValue(key, out bool pickSignature))
+            {
+                pickSignature = randomPremium.Next(2) == 0;
+                randomPremiumPicks[key] = pickSignature;
+            }
+            return pickSignature;
+        }
+
         public static bool GetPremiumType<T>(ref T ___m_entity, ref TAG_PREMIUM __result)
             where T : EntityBase
         {
@@ -65,9 +89,10 @@ namespace HsMod
                                     ___m_entity.SetTag(GAME_TAG.HAS_DIAMOND_QUALITY, true);
                                 }
 
-                                // 异画优先
+                                // 异画优先；开启钻石异画随机时，每张实体卡每局随机选一个
                                 if (___m_entity.HasTag(GAME_TAG.HAS_SIGNATURE_QUALITY) &&
-                                    isSignatureCardStateEnable.Value && signatureFirst.Value)
+                                    isSignatureCardStateEnable.Value &&
+                                    (signatureDiamondRandom.Value ? RandomPicksSignature(___m_entity) : signatureFirst.Value))
                                 {
                                     ___m_entity.SetTag(GAME_TAG.PREMIUM, TAG_PREMIUM.SIGNATURE);
                                     __result = TAG_PREMIUM.SIGNATURE;
