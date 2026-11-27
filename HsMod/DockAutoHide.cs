@@ -7,31 +7,16 @@ using static HsMod.PluginConfig;
 
 namespace HsMod
 {
-    // macOS only: auto-hide the Dock and/or the menu bar while Hearthstone is the frontmost
-    // app, and put them back when the game loses focus or quits.
+    // macOS only: auto-hide the Dock while Hearthstone is the frontmost app, and put it back
+    // when the game loses focus or quits.
     //
-    // Each one is only ever flipped from "shown" to "auto-hide" and back. If it already
-    // auto-hides, it is left alone. While we have one hidden, its marker file exists; if the
-    // game crashes, the next start (or launch_hsmod.sh, once the game process is gone) sees
-    // the marker and restores it.
+    // It only ever flips the Dock from "always shown" to "auto-hide" and back. If the Dock
+    // already auto-hides, it is left alone. While the Dock is hidden by us, a marker file
+    // exists; if the game crashes, the next start (or launch_hsmod.sh, once the game process
+    // is gone) sees the marker and restores the Dock.
     public static class DockAutoHide
     {
-        private sealed class Bar
-        {
-            public string Name;
-            public string Property;      // System Events "dock preferences" property
-            public string MarkerFileName;
-            public Func<bool> Enabled;
-            public bool WeHid;           // guarded by applyLock
-            public string MarkerPath => Path.Combine(BepInEx.Paths.ConfigPath, MarkerFileName);
-        }
-
-        private static readonly Bar[] bars =
-        {
-            new Bar { Name = "Dock", Property = "autohide", MarkerFileName = "HsMod.dock_hidden", Enabled = () => isDockAutoHideEnable.Value },
-            new Bar { Name = "menu bar", Property = "autohide menu bar", MarkerFileName = "HsMod.menubar_hidden", Enabled = () => isMenuBarAutoHideEnable.Value },
-        };
-
+        private const string MarkerFileName = "HsMod.dock_hidden";
         private const int OsascriptTimeoutMs = 60000;   // the first run waits on the Automation permission prompt
         private const int QuitTimeoutMs = 3000;
 
@@ -40,6 +25,9 @@ namespace HsMod
         private static Thread worker;
         private static volatile bool hasFocus = true;
         private static volatile bool stopping;
+        private static bool weHidDock;   // guarded by applyLock
+
+        private static string MarkerPath => Path.Combine(BepInEx.Paths.ConfigPath, MarkerFileName);
 
         public static bool IsSupported => Application.platform == RuntimePlatform.OSXPlayer;
 
@@ -47,12 +35,11 @@ namespace HsMod
         {
             if (!IsSupported || worker != null) return;
 
-            // A marker left behind means an earlier run hid that bar and never restored it.
-            foreach (var bar in bars) bar.WeHid = File.Exists(bar.MarkerPath);
+            // A marker left behind means an earlier run hid the Dock and never restored it.
+            weHidDock = File.Exists(MarkerPath);
             hasFocus = Application.isFocused;
 
             isDockAutoHideEnable.SettingChanged += delegate { wake.Set(); };
-            isMenuBarAutoHideEnable.SettingChanged += delegate { wake.Set(); };
             worker = new Thread(WorkerLoop) { IsBackground = true, Name = "HsMod.DockAutoHide" };
             worker.Start();
             wake.Set();
@@ -74,8 +61,7 @@ namespace HsMod
             if (!Monitor.TryEnter(applyLock, QuitTimeoutMs)) return;
             try
             {
-                foreach (var bar in bars)
-                    if (bar.WeHid) Apply(bar, false, QuitTimeoutMs);
+                if (weHidDock) Apply(false, QuitTimeoutMs);
             }
             finally
             {
@@ -91,56 +77,53 @@ namespace HsMod
                 if (stopping) return;
                 lock (applyLock)
                 {
-                    foreach (var bar in bars)
+                    if (stopping) return;
+                    try
                     {
-                        if (stopping) return;
-                        try
+                        bool wantHidden = isPluginEnable.Value && isDockAutoHideEnable.Value && hasFocus;
+                        if (wantHidden && !weHidDock)
                         {
-                            bool wantHidden = isPluginEnable.Value && bar.Enabled() && hasFocus;
-                            if (wantHidden && !bar.WeHid)
-                            {
-                                if (GetAutoHide(bar) == false) Apply(bar, true, OsascriptTimeoutMs);
-                            }
-                            else if (!wantHidden && bar.WeHid)
-                            {
-                                Apply(bar, false, OsascriptTimeoutMs);
-                            }
+                            bool? alreadyHidden = GetAutoHide();
+                            if (alreadyHidden == false) Apply(true, OsascriptTimeoutMs);
                         }
-                        catch (Exception ex)
+                        else if (!wantHidden && weHidDock)
                         {
-                            Utils.MyLogger(BepInEx.Logging.LogLevel.Error, $"DockAutoHide ({bar.Name}): {ex.Message}");
+                            Apply(false, OsascriptTimeoutMs);
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        Utils.MyLogger(BepInEx.Logging.LogLevel.Error, $"DockAutoHide: {ex.Message}");
                     }
                 }
             }
         }
 
         // Caller holds applyLock.
-        private static void Apply(Bar bar, bool hide, int timeoutMs)
+        private static void Apply(bool hide, int timeoutMs)
         {
-            string script = $"tell application \"System Events\" to set {bar.Property} of dock preferences to {(hide ? "true" : "false")}";
             if (hide)
             {
                 // Write the marker first, so a crash right after hiding can still be recovered.
-                File.WriteAllText(bar.MarkerPath, DateTime.Now.ToString("o"));
-                if (RunOsascript(script, timeoutMs) != null)
-                    bar.WeHid = true;
+                File.WriteAllText(MarkerPath, DateTime.Now.ToString("o"));
+                if (RunOsascript("tell application \"System Events\" to set autohide of dock preferences to true", timeoutMs) != null)
+                    weHidDock = true;
                 else
-                    File.Delete(bar.MarkerPath);
+                    File.Delete(MarkerPath);
             }
             else
             {
-                if (RunOsascript(script, timeoutMs) != null)
+                if (RunOsascript("tell application \"System Events\" to set autohide of dock preferences to false", timeoutMs) != null)
                 {
-                    bar.WeHid = false;
-                    File.Delete(bar.MarkerPath);
+                    weHidDock = false;
+                    File.Delete(MarkerPath);
                 }
             }
         }
 
-        private static bool? GetAutoHide(Bar bar)
+        private static bool? GetAutoHide()
         {
-            string output = RunOsascript($"tell application \"System Events\" to get {bar.Property} of dock preferences", OsascriptTimeoutMs);
+            string output = RunOsascript("tell application \"System Events\" to get autohide of dock preferences", OsascriptTimeoutMs);
             if (output == null) return null;
             output = output.Trim();
             if (output == "true") return true;
