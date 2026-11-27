@@ -182,6 +182,9 @@ namespace HsMod
             // Local display for unowned Battlegrounds pets
             BgPetSpoofer.Init();
 
+            // macOS: auto-hide the Dock while the game is in front
+            DockAutoHide.Init();
+
             //启动web服务
             WebServer.Start();
             // 加载所有自定义卡牌
@@ -477,6 +480,16 @@ namespace HsMod
                     }
                 }
             }
+        }
+
+        private void OnApplicationFocus(bool focus)
+        {
+            DockAutoHide.OnFocus(focus);
+        }
+
+        private void OnApplicationQuit()
+        {
+            DockAutoHide.Shutdown();
         }
 
         private void OnDestroy()

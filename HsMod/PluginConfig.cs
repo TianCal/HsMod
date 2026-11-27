@@ -26,6 +26,7 @@ namespace HsMod
 
         public static ConfigEntry<bool> isIGMMessageShow;
         public static ConfigEntry<bool> isOnApplicationFocus;
+        public static ConfigEntry<bool> isDockAutoHideEnable;
         public static ConfigEntry<bool> isAutoExit;
         //public static ConfigEntry<bool> isAutoRestart;
         public static ConfigEntry<bool> isAlertPopupShow;
@@ -227,6 +228,7 @@ namespace HsMod
             isAlertPopupShow = config.Bind(LocalizationManager.GetLangValue("isAlertPopupShow.label"), LocalizationManager.GetLangValue("isAlertPopupShow.name"), true, LocalizationManager.GetLangValue("isAlertPopupShow.description"));
             responseAlertPopup = config.Bind(LocalizationManager.GetLangValue("responseAlertPopup.label"), LocalizationManager.GetLangValue("responseAlertPopup.name"), Utils.AlertPopupResponse.DONOTHING, LocalizationManager.GetLangValue("responseAlertPopup.description"));
             isOnApplicationFocus = config.Bind(LocalizationManager.GetLangValue("isOnApplicationFocus.label"), LocalizationManager.GetLangValue("isOnApplicationFocus.name"), true, LocalizationManager.GetLangValue("isOnApplicationFocus.description"));
+            isDockAutoHideEnable = config.Bind(LocalizationManager.GetLangValue("isDockAutoHideEnable.label"), LocalizationManager.GetLangValue("isDockAutoHideEnable.name"), false, LocalizationManager.GetLangValue("isDockAutoHideEnable.description"));
             isRewardToastShow = config.Bind(LocalizationManager.GetLangValue("isRewardToastShow.label"), LocalizationManager.GetLangValue("isRewardToastShow.name"), true, LocalizationManager.GetLangValue("isRewardToastShow.description"));
             isAutoOpenBoxesRewardEnable = config.Bind(LocalizationManager.GetLangValue("isAutoOpenBoxesRewardEnable.label"), LocalizationManager.GetLangValue("isAutoOpenBoxesRewardEnable.name"), false, LocalizationManager.GetLangValue("isAutoOpenBoxesRewardEnable.description"));
             isAutoExit = config.Bind(LocalizationManager.GetLangValue("isAutoExit.label"), LocalizationManager.GetLangValue("isAutoExit.name"), false, LocalizationManager.GetLangValue("isAutoExit.description"));
