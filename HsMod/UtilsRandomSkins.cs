@@ -58,7 +58,8 @@ namespace HsMod
     77320,  // HERO_09n 神圣巨兽安度因
     101767, // HERO_09ae 学徒赫达尼斯
     101701, // HERO_09ad 电子摇摆怀特迈恩
-    127672  // HERO_09bl Twilight Father Benedictus / 暮光教父本尼迪塔斯
+    127672, // HERO_09bl Twilight Father Benedictus / 暮光教父本尼迪塔斯
+    127683  // HERO_09bm Twilight Cultist Whitemane / 暮光信徒怀特迈恩
   ],
   ""WARRIOR"": [
     114180, // HERO_01aq 魔铁瓦里安
@@ -66,7 +67,8 @@ namespace HsMod
     107749, // HERO_01aj_Denathrius 沙龙贵宾德纳修斯
     79966,  // HERO_01q 冬天爷爷麦格尼
     112788, // HERO_01au 督军德拉卡
-    78174   // HERO_01o 范达尔·雷矛
+    78174,  // HERO_01o 范达尔·雷矛
+    121638  // HERO_01bg Magni Reforged / 重塑的麦格尼
   ],
   ""DRUID"": [
     78180,  // HERO_06p 钢铁守护者玛法里奥
@@ -98,7 +100,8 @@ namespace HsMod
   ""DEATHKNIGHT"": [
     133179, // HERO_11bl Teron Gorefiend / 塔隆·血魔
     127666, // HERO_11ax Lord Victor Nefarius / 维克多·奈法里奥斯
-    119053  // HERO_11ag The Jailer / 典狱长
+    119053, // HERO_11ag The Jailer / 典狱长
+    130386  // HERO_11az The Future King / 未来之王
   ],
   ""DEMONHUNTER"": [
     78177,  // HERO_10l Infernal Armor Illidan / 狱火护甲伊利丹
