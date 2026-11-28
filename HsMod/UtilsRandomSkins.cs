@@ -47,7 +47,79 @@ namespace HsMod
   ""PALADIN"": [
     123699, // HERO_04bf 格尔宾·梅卡托克
     83395,  // HERO_04u 火车王里诺艾
-    112745  // HERO_04au 奥伯妮·亮鬃
+    112745, // HERO_04au 奥伯妮·亮鬃
+    131822, // HERO_04bx Corrupted Leeroy / 腐化的火车王
+    131081, // HERO_04cb Arator the Redeemer / 救赎者阿拉托尔
+    133206  // HERO_04cg Bounty Hunter Finley / 赏金猎人芬利
+  ],
+  ""PRIEST"": [
+    107730, // HERO_09aj_EliseStarseeker 队伍领袖伊莉斯
+    67710,  // HERO_09e 军情七处安度因
+    77320,  // HERO_09n 神圣巨兽安度因
+    101767, // HERO_09ae 学徒赫达尼斯
+    101701, // HERO_09ad 电子摇摆怀特迈恩
+    127672  // HERO_09bl Twilight Father Benedictus / 暮光教父本尼迪塔斯
+  ],
+  ""WARRIOR"": [
+    114180, // HERO_01aq 魔铁瓦里安
+    101666, // HERO_01ac 精英牛头人酋长
+    107749, // HERO_01aj_Denathrius 沙龙贵宾德纳修斯
+    79966,  // HERO_01q 冬天爷爷麦格尼
+    112788, // HERO_01au 督军德拉卡
+    78174   // HERO_01o 范达尔·雷矛
+  ],
+  ""DRUID"": [
+    78180,  // HERO_06p 钢铁守护者玛法里奥
+    83398,  // HERO_06u 费林大使
+    123761, // HERO_06bi Chao Feng Lunara / 嘲风望月露娜拉
+    131396, // HERO_06bx Zin-Azshari Faelin / 辛艾萨莉的费林
+    114329, // HERO_06as Leyara / 莱雅娜
+    123708  // HERO_06bh Old Ways Ulfar / 老派德鲁伊奥尔法
+  ],
+  ""WARLOCK"": [
+    103774, // HERO_07af 白骨占卜师塔姆辛
+    108386, // HERO_07am_Godfrey 高弗雷勋爵
+    93724   // HERO_07y 加拉肯斯坦
+  ],
+  ""SHAMAN"": [
+    105083, // HERO_02an 青玉闪电之王
+    101641, // HERO_02ag 因扎
+    77248,  // HERO_02n 青蛙王子萨尔
+    123717  // HERO_02bm Earthen Ring Akama / 大地之环的阿卡玛
+  ],
+  ""MAGE"": [
+    101775, // HERO_08am Kit Waxwhisker / 基特·蜡须
+    130936, // HERO_08ck Millhouse Manastorm / 米尔豪斯·法力风暴
+    123771, // HERO_08bv Qiu Niu Tsulong / 囚牛弄弦烛龙
+    98729,  // HERO_08al Saraad / 萨兰德
+    127751, // HERO_08ce Tarecgosa / 泰蕾苟萨
+    103768  // HERO_08ao Celeste-ial / 星宿灵龙
+  ],
+  ""DEATHKNIGHT"": [
+    133179, // HERO_11bl Teron Gorefiend / 塔隆·血魔
+    127666, // HERO_11ax Lord Victor Nefarius / 维克多·奈法里奥斯
+    119053  // HERO_11ag The Jailer / 典狱长
+  ],
+  ""DEMONHUNTER"": [
+    78177,  // HERO_10l Infernal Armor Illidan / 狱火护甲伊利丹
+    98361,  // HERO_10x Omen / 年兽
+    133194  // HERO_10ca Wild God Omen / 荒野之神年兽
+  ],
+  ""ROGUE"": [
+    109340, // HERO_03ak_Patches Patches the Pirate / 海盗帕奇斯
+    123768, // HERO_03bk Sinestra / 希奈丝特拉
+    67846,  // HERO_03f Gladiator Valeera / 角斗士瓦莉拉
+    103776, // HERO_03af V-07-TR-0N / V-07-TR-0N
+    127961, // HERO_03bn Dalaran Warden Maiev / 达拉然典狱官玛维
+    101654  // HERO_03ab Center Stage Valeera / 舞台焦点瓦莉拉
+  ],
+  ""HUNTER"": [
+    123758, // HERO_05bi King Maluk / 穆拉克
+    127663, // HERO_05bn Magmaw / 熔喉
+    130942, // HERO_05bt Wuxia Sylvanas / 女侠希尔瓦娜斯
+    121603, // HERO_05bb Dino Hunter Lor'themar / 恐龙猎人洛瑟玛
+    105081, // HERO_05ae Stepfather Lor'themar / 义父洛瑟玛
+    84155   // HERO_05v Flameshot Sylvanas / 火焰射手希尔瓦娜斯
   ]
 }
 ";
